@@ -1,6 +1,23 @@
 import numpy as np
 import pandas as pd
-from sklearn.metrics import roc_auc_score, accuracy_score
+from sklearn.metrics import roc_auc_score, accuracy_score, roc_curve
+
+
+def find_optimal_cutoff(excel_path: str, sheet_name: str, true_label_col: str, pred_proba_col: str) -> float:
+    """
+    根据约登指数从Excel文件中计算最佳分类阈值。
+    """
+    df = pd.read_excel(excel_path, sheet_name=sheet_name)
+    y_true = df[true_label_col]
+    y_pred_proba = df[pred_proba_col]
+
+    fpr, tpr, thresholds = roc_curve(y_true, y_pred_proba)
+
+    youden_index = tpr - fpr
+    best_index = np.argmax(youden_index)
+    optimal_cutoff = thresholds[best_index]
+
+    return optimal_cutoff
 
 
 def calculate_metrics_auc_acc(file_path, split_type=None, cutoff=0.5):
