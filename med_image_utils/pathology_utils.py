@@ -3,6 +3,14 @@ import cv2
 import staintools
 from tqdm import tqdm
 from natsort import natsorted
+import argparse, os, json, numpy as np
+from tqdm import tqdm
+from PIL import Image, ImageDraw
+import geopandas as gpd
+import openslide
+from shapely.geometry import shape, Polygon, MultiPolygon
+from shapely import affinity
+from rasterio import features
 
 
 def wsi_stain_normalization(reference_image_path: str,
@@ -82,3 +90,75 @@ def wsi_stain_normalization(reference_image_path: str,
     print("\nStain normalization finished.")
     print(f"Failed files: {len(failed)}" if failed else "All images processed successfully.")
     return failed
+
+
+def geojson_to_mask(wsi_path, geo_path, out_path, level=8, use_rasterio=True):
+    slide = openslide.OpenSlide(wsi_path)
+    level = min(level, slide.level_count - 1)
+    w, h = slide.level_dimensions[level]
+    down_factor = slide.level_downsamples[level]
+
+    gdf = gpd.read_file(geo_path)
+    polys = [geom for geom in gdf.geometry if isinstance(geom, (Polygon, MultiPolygon))]
+    if not polys:
+        print(f'[{os.path.basename(wsi_path)}] No polygon, skip.')
+        return
+
+    def scale_geom(geom):
+        return affinity.scale(
+            geom,
+            xfact=1.0 / down_factor,
+            yfact=1.0 / down_factor,
+            origin=(0, 0)
+        )
+
+    scaled_polys = [scale_geom(p) for p in polys]
+
+    if use_rasterio:
+        mask = features.rasterize(
+            ((g, 255) for g in scaled_polys),
+            out_shape=(h, w),
+            fill=0,
+            dtype=np.uint8
+        )
+    else:
+        img = Image.new("L", (w, h), 0)
+        draw = ImageDraw.Draw(img)
+        for g in scaled_polys:
+            if isinstance(g, Polygon):
+                draw.polygon(list(g.exterior.coords), outline=255, fill=255)
+            else:
+                for sub in g:
+                    draw.polygon(list(sub.exterior.coords), outline=255, fill=255)
+        mask = np.array(img, dtype=np.uint8)
+
+    Image.fromarray(mask, mode="L").save(out_path, compress_level=1)
+    slide.close()
+
+
+def batch_convert(wsi_dir, geojson_dir, mask_dir, level=8):
+    os.makedirs(mask_dir, exist_ok=True)
+    wsi_files = [f for f in os.listdir(wsi_dir) if f.lower().endswith(('.svs', '.tif', '.tiff', '.ndpi'))]
+    for fname in tqdm(wsi_files, desc="Converting"):
+        stem = os.path.splitext(fname)[0]
+        wsi = os.path.join(wsi_dir, fname)
+        geo = os.path.join(geojson_dir, stem + '.geojson')
+        out = os.path.join(mask_dir, stem + '.png')
+        if os.path.exists(out):
+            print(f'Exist {out} Skip')
+        if not os.path.exists(geo):
+            print(f'[WARN] {geo} not found, skip.')
+            continue
+        geojson_to_mask(wsi, geo, out, level=level)
+
+
+if __name__ == "__main__":
+    # wsi_dir =     r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testWSI"
+    # geojson_dir = r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testGeoJson"
+    # mask_dir =    r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testWSImasks"
+    # batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
+
+    wsi_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSI_1"
+    geojson_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testGeoJson"
+    mask_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSImasks"
+    batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
