@@ -2,7 +2,9 @@ import glob
 import gzip
 import os
 import shutil
+import sys
 from pathlib import Path
+from typing import Iterable
 
 import SimpleITK as sitk
 import nibabel as nib
@@ -137,5 +139,42 @@ def repair_nifti_files(directory):
                     temp_path.unlink()
 
 
+def Nii2Nifti() -> None:
+    """
+        nii格式转为nii.gz格式, 注意会删除原本的nii格式文件, 替代为新的nii.gz格式文件
+    """
+    def iterate_nii_files(root: Path) -> Iterable[Path]:
+        """递归获取所有扩展名为 .nii 的文件，忽略已压缩的 .nii.gz。"""
+        yield from (p for p in root.rglob("*.nii") if not p.name.endswith(".nii.gz"))
+
+    def compress_nii(nii_path: Path) -> None:
+        """将 .nii 压缩为 .nii.gz，成功后删除原文件。"""
+        gz_path = nii_path.with_suffix(".nii.gz")
+        if gz_path.exists():
+            print(f"[跳过] 目标文件已存在: {gz_path}", file=sys.stderr)
+            return
+
+        print(f"[开始] 压缩 {nii_path} -> {gz_path}")
+        try:
+            with nii_path.open("rb") as src, gzip.open(gz_path, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            nii_path.unlink()  # 压缩成功再删除原文件
+            print(f"[完成] {gz_path}")
+        except Exception as exc:
+            if gz_path.exists():
+                gz_path.unlink(missing_ok=True)
+            print(f"[错误] 压缩失败 {nii_path}: {exc}", file=sys.stderr)
+
+    ROOT_DIR = Path(r"D:\Data\OvarianCancer\Datasets\CA_hos_Label\Original")
+
+    if not ROOT_DIR.exists():
+        print(f"[致命] 指定根目录不存在: {ROOT_DIR}", file=sys.stderr)
+        return
+
+    for nii in iterate_nii_files(ROOT_DIR):
+        compress_nii(nii)
+
+
 if __name__ == '__main__':
-    pass
+    check_and_adjust_properties(r'D:\Data\OvarianCancer\Datasets\CA_hos_Label\T2\Images',
+                                r'D:\Data\OvarianCancer\Datasets\CA_hos_Label\T2\Labels')
