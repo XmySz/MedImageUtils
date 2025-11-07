@@ -21,7 +21,7 @@ def find_optimal_cutoff(excel_path: str, sheet_name: str, true_label_col: str, p
 
 
 def calculate_metrics_auc_acc(file_path, split_type=None, cutoff=0.5):
-    df = pd.read_excel(file_path, sheet_name='Sheet3')
+    df = pd.read_excel(file_path, sheet_name='Sheet1')
     if split_type:
         data = df[df['split_fold_1'] == split_type]
     else:
