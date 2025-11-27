@@ -1,6 +1,7 @@
 import os
 import cv2
 import staintools
+from sympy.codegen.ast import continue_
 from tqdm import tqdm
 from natsort import natsorted
 import argparse, os, json, numpy as np
@@ -11,6 +12,9 @@ import openslide
 from shapely.geometry import shape, Polygon, MultiPolygon
 from shapely import affinity
 from rasterio import features
+import tifffile
+from pathlib import Path
+from PIL import Image
 
 
 def wsi_stain_normalization(reference_image_path: str,
@@ -152,13 +156,65 @@ def batch_convert(wsi_dir, geojson_dir, mask_dir, level=8):
         geojson_to_mask(wsi, geo, out, level=level)
 
 
+def export_wsi_thumbnail(wsi_path, downsample=16, output_path=None):
+    """导出WSI缩略图"""
+    slide = openslide.OpenSlide(wsi_path)
+
+    # 找最接近的level
+    level = min(range(slide.level_count),
+                key=lambda i: abs(slide.level_downsamples[i] - downsample))
+
+    # 读取并转换
+    size = slide.level_dimensions[level]
+    img = slide.read_region((0, 0), level, size).convert('RGB')
+
+    # 如需要则调整大小
+    actual_downsample = slide.level_downsamples[level]
+    if abs(actual_downsample - downsample) > 0.1:
+        scale = actual_downsample / downsample
+        new_size = (int(size[0] / scale), int(size[1] / scale))
+        img = img.resize(new_size, Image.LANCZOS)
+
+    # 自动处理输出路径
+    if output_path is None or os.path.isdir(output_path):
+        basename = os.path.splitext(os.path.basename(wsi_path))[0]
+        filename = f"{basename}_x{downsample}.jpg"
+        output_path = filename if output_path is None else os.path.join(output_path, filename)
+
+    img.save(output_path, 'JPEG', quality=95)
+    slide.close()
+    return output_path
+
+
+def extract_svs_labels(input_dir, output_dir, label_or_macro='label'):
+    """提取所有SVS文件的标签层/缩略图层到新目录"""
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+
+    for svs_file in Path(input_dir).glob('*.svs'):
+        try:
+            if os.path.exists(f"{output_dir}/{svs_file.stem}.png"):
+                continue
+            with tifffile.TiffFile(svs_file) as tif:
+                label = tif.pages[-2].asarray() if label_or_macro == 'label' else tif.pages[-1].asarray()
+
+                img = Image.fromarray(label)
+                if img.mode not in ['RGB', 'L', 'RGBA']:
+                    img = img.convert('RGB')
+
+                img.save(f"{output_dir}/{svs_file.stem}.png")
+                print(f"已保存: {svs_file.stem}.png")
+        except Exception as e:
+            print(f"{svs_file} 处理过程中出现了错误! ")
+
 if __name__ == "__main__":
     # wsi_dir =     r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testWSI"
     # geojson_dir = r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testGeoJson"
     # mask_dir =    r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testWSImasks"
     # batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
 
-    wsi_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSI_1"
-    geojson_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testGeoJson"
-    mask_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSImasks"
-    batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
+    # wsi_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSI_1"
+    # geojson_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testGeoJson"
+    # mask_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSImasks"
+    # batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
+
+    extract_svs_labels(r'F:\内膜\EC\WSI', r'F:\内膜\EC\Labels', label_or_macro='label')

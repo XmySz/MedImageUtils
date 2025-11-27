@@ -23,11 +23,11 @@ def find_optimal_cutoff(excel_path: str, sheet_name: str, true_label_col: str, p
 def calculate_metrics_auc_acc(file_path, split_type=None, cutoff=0.5):
     df = pd.read_excel(file_path, sheet_name='Sheet1')
     if split_type:
-        data = df[df['split_fold_1'] == split_type]
+        data = df[df['split'] == split_type]
     else:
         data = df
     y_true = data['Label'].values
-    y_prob = data['Clinical_Predicted_Probability_fold1'].values
+    y_prob = data['MRI_CRS'].values
     y_pred = (y_prob >= cutoff).astype(int)
 
     auc = roc_auc_score(y_true, y_prob)
@@ -172,4 +172,6 @@ def calculate_metrics_f1(file_path, split_type=None, cutoff=0.5):
 
 
 if __name__ == '__main__':
-    pass
+    print(calculate_metrics_auc_acc(r'D:\Data\OvarianCancer\Materials\NewLabel.xlsx', split_type='valid'))
+    print(calculate_metrics_auc_acc(r'D:\Data\OvarianCancer\Materials\NewLabel.xlsx', split_type='test'))
+    print(calculate_metrics_auc_acc(r'D:\Data\OvarianCancer\Materials\NewLabel.xlsx', split_type='test1'))

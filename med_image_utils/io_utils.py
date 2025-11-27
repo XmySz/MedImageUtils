@@ -1,5 +1,6 @@
 import glob
 import os
+import shutil
 from typing import Optional, Union, List, Tuple
 
 import pandas as pd
@@ -49,7 +50,6 @@ def find_files_to_table(root_dir: str, file_extensions: Optional[Union[str, List
         - 多种格式: ['.jpg', '.png']
         - 所有文件: None (默认)
         - 格式匹配不区分大小写。
-
     返回:
     pandas.DataFrame: 一个包含'文件名'和'路径'两列的DataFrame。
     """
@@ -92,5 +92,43 @@ def find_files_to_table(root_dir: str, file_extensions: Optional[Union[str, List
         print("搜索完成！未找到任何匹配的文件。")
 
 
+def move_matching_files(dir1, dir2, dir3):
+    """
+        读取目录1下所有的文件 如果这个文件在目录2也存在的话 就移动到目录3
+    Args:
+        dir1:
+        dir2:
+        dir3:
+
+    Returns:
+
+    """
+    for file1 in os.listdir(dir1):
+        name1 = os.path.splitext(file1)[0]
+        for file2 in os.listdir(dir2):
+            name2 = os.path.splitext(file2)[0]
+            if name1 == name2:
+                shutil.move(os.path.join(dir1, file1), os.path.join(dir3, file1))
+                break
+
+
+def move_files_from_excel(excel_path: str, column_name: str, dir1: str, dir2: str) -> None:
+    """
+    根据Excel表格中的文件名列表，将目录1中匹配的文件移动到目录2
+
+    参数:
+        excel_path: Excel文件路径
+        column_name: 包含文件名的列名
+        dir1: 源目录
+        dir2: 目标目录
+    """
+    df = pd.read_excel(excel_path)
+    filenames = df[column_name].tolist()
+
+    for file in os.listdir(dir1):
+        if file in filenames:
+            shutil.move(os.path.join(dir1, file), os.path.join(dir2, file))
+
+
 if __name__ == '__main__':
-    pass
+    move_matching_files(r'F:\内膜\EC\WSI\最终可用\待处理', r'F:\内膜\EC\Labels\最终可用\已处理', r'F:\内膜\EC\WSI\最终可用\已处理')
