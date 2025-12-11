@@ -1,6 +1,7 @@
 import glob
 import os
 import shutil
+from pathlib import Path
 from typing import Optional, Union, List, Tuple
 
 import pandas as pd
@@ -130,5 +131,100 @@ def move_files_from_excel(excel_path: str, column_name: str, dir1: str, dir2: st
             shutil.move(os.path.join(dir1, file), os.path.join(dir2, file))
 
 
+def compare_directories(dir1: str, dir2: str) -> tuple[set[str], set[str]]:
+    """
+    比较两个目录的文件（忽略扩展名）
+
+    参数:
+        dir1: 目录1的路径
+        dir2: 目录2的路径
+
+    返回:
+        (只在目录1中的文件集合, 只在目录2中的文件集合)
+    """
+    files1 = {f.stem for f in Path(dir1).iterdir() if f.is_file()}
+    files2 = {f.stem for f in Path(dir2).iterdir() if f.is_file()}
+
+    only_in_dir1 = files1 - files2
+    only_in_dir2 = files2 - files1
+
+    return only_in_dir1, only_in_dir2
+
+
+def rename_files_from_excel(directory: str, excel_file: str, col_old: str, col_new: str) -> dict[str, str]:
+    """
+    根据Excel中的映射关系重命名目录下的文件
+
+    参数:
+        directory: 目标目录路径
+        excel_file: Excel文件路径
+        col_old: 原文件名列名
+        col_new: 新文件名列名
+
+    返回:
+        重命名成功的文件映射字典 {原文件名: 新文件名}
+    """
+    df = pd.read_excel(excel_file)
+    dir_path = Path(directory)
+
+    # 创建映射字典（去掉后缀）
+    name_map = {}
+    for _, row in df.iterrows():
+        old_name = Path(str(row[col_old])).stem
+        new_name = Path(str(row[col_new])).stem
+        name_map[old_name] = new_name
+
+    renamed = {}
+
+    for file in dir_path.iterdir():
+        if not file.is_file():
+            continue
+
+        file_stem = file.stem
+
+        if file_stem in name_map:
+            new_name = name_map[file_stem]
+            new_file = dir_path / f"{new_name}{file.suffix}"
+
+            # 检查目标文件是否已存在
+            if new_file.exists():
+                print(f"跳过：{file.name} -> {new_file.name}（目标文件已存在）")
+                continue
+
+            # 检查是否会造成重复
+            if new_name in renamed.values():
+                print(f"跳过：{file.name} -> {new_file.name}（会造成重复）")
+                continue
+
+            file.rename(new_file)
+            renamed[file.name] = new_file.name
+            print(f"重命名：{file.name} -> {new_file.name}")
+
+    return renamed
+
+
+def export_files_to_excel(directory: str, output_file: str) -> None:
+    """
+    将目录下所有文件的名称和路径导出到Excel
+
+    参数:
+        directory: 要扫描的目录路径
+        output_file: 输出的Excel文件路径
+    """
+    dir_path = Path(directory)
+
+    files_data = []
+    for file in dir_path.rglob('*'):
+        if file.is_file():
+            files_data.append({
+                '文件名': file.name,
+                '完整路径': str(file.absolute()),
+            })
+
+    df = pd.DataFrame(files_data)
+    df.to_excel(output_file, index=False)
+    print(f"已导出 {len(files_data)} 个文件到 {output_file}")
+
+
 if __name__ == '__main__':
-    move_matching_files(r'F:\内膜\EC\WSI\最终可用\待处理', r'F:\内膜\EC\Labels\最终可用\已处理', r'F:\内膜\EC\WSI\最终可用\已处理')
+    export_files_to_excel(r'F:\内膜\EC\WSI\最终可用', r'F:\内膜\EC\WSI\最终可用.xlsx')
