@@ -12,10 +12,6 @@ original_stderr = sys.stderr
 sys.stderr = open(os.devnull, 'w')
 
 
-# ======================
-# 基础工具函数（原有）
-# ======================
-
 def _get_base_magnification(slide):
     props = slide.properties
     for key in ['aperio.AppMag', 'openslide.objective-power']:
@@ -128,10 +124,6 @@ def _prepare_tumor_mask(mask_path, slide):
     }
 
 
-# ======================
-# GeoJSON 相关新函数
-# ======================
-
 def _load_geojson_features(geojson_path):
     with open(geojson_path, "r", encoding="utf-8") as f:
         data = json.load(f)
@@ -239,10 +231,6 @@ def _prepare_geojson_polygons_for_level(slide, patch_level, geojson_path, target
     return polygons_level
 
 
-# ======================
-# 主函数：导出 patch & 可选细胞 mask
-# ======================
-
 def export_patches_from_wsi(
         wsi_path,
         output_dir,
@@ -252,7 +240,6 @@ def export_patches_from_wsi(
         tissue_threshold=0.5,
         thumb_output_dir=None,
         tumor_mask_path=None,
-        # ---- 新增参数 ----
         geojson_path=None,
         target_cell_type=None,
         use_type_str=False,
@@ -482,6 +469,9 @@ def export_patches_from_wsi(
                         mask_filename = f"{patch_filename_base}_mask.png"
                         mask_output_path = os.path.join(output_dir, mask_filename)
                         cv2.imwrite(mask_output_path, cell_mask_patch)
+                        print(
+                            '保存TILs的细胞mask', mask_output_path
+                        )
 
                     patch_idx += 1
 
@@ -500,26 +490,33 @@ def export_patches_from_wsi(
 
 
 if __name__ == '__main__':
-    # ====== 示例用法，根据你自己的路径修改 ======
-    wsi_path = r"F:\内膜\内膜癌svs文件\201121909002.svs"
-    output_dir = r"D:\Data\Temp\test"
-    thumb_output_dir = r"D:\Data\Temp\test_mask"
-    tumor_mask_path = r"F:\内膜\201121909002.png"  # 可为 None
+    for id in os.listdir(r'F:\EC\TumorMask_PNG\最终可用'):
+        id = id[:-4]
 
-    # 新增：GeoJSON + target_cell_type（可选）
-    geojson_path = r"D:\Data\Temp\WSIout\json\201121909002.geojson"  # 如果不需要细胞 mask，可设为 None
-    target_cell_type = "lymphocyte"  # 例如 "epithelial" / "lymphocyte" 等
+        output_dir = f"F:\\EC\\Patches\\{id}"
 
-    export_patches_from_wsi(
-        wsi_path=wsi_path,
-        output_dir=output_dir,
-        patch_size=512,
-        patch_format='png',
-        target_magnification=20,
-        tissue_threshold=0.5,
-        thumb_output_dir=thumb_output_dir,
-        tumor_mask_path=tumor_mask_path,
-        geojson_path=geojson_path,
-        target_cell_type=target_cell_type,
-        use_type_str=False,  # 若想用 properties['type_str'] 匹配，就设 True
-    )
+        if os.path.exists(output_dir):
+            print(f'存在{id}, 跳过')
+            continue
+
+        wsi_path = f"F:\\EC\\WSI\\最终可用\\{id}.svs"
+        thumb_output_dir = f"F:\\EC\\Patches\\{id}"
+        tumor_mask_path = f'F:\\EC\\TumorMask_PNG\\最终可用\\{id}.png'  # 可为 None
+
+        # 新增：GeoJSON + target_cell_type
+        geojson_path = f"F:\\EC\\TILsMask\\最终可用\\{id}.geojson"  # 如果不需要细胞 mask，可设为 None
+        target_cell_type = "lymphocyte"
+
+        export_patches_from_wsi(
+            wsi_path=wsi_path,
+            output_dir=output_dir,
+            patch_size=512,
+            patch_format='png',
+            target_magnification=20,
+            tissue_threshold=0.5,
+            thumb_output_dir=thumb_output_dir,
+            tumor_mask_path=tumor_mask_path,
+            geojson_path=geojson_path,
+            target_cell_type=target_cell_type,
+            use_type_str=False,  # 若想用 properties['type_str'] 匹配，就设 True
+        )

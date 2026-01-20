@@ -186,7 +186,7 @@ def export_wsi_thumbnail(wsi_path, downsample=16, output_path=None):
     return output_path
 
 
-def extract_svs_labels(input_dir, output_dir, label_or_macro='label'):
+def extract_wsi_labels_or_macro(input_dir, output_dir, label_or_macro='label'):
     """提取所有SVS文件的标签层/缩略图层到新目录"""
     Path(output_dir).mkdir(parents=True, exist_ok=True)
 
@@ -217,4 +217,4 @@ if __name__ == "__main__":
     # mask_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSImasks"
     # batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
 
-    extract_svs_labels(r'F:\内膜\EC\WSI', r'F:\内膜\EC\Labels', label_or_macro='label')
+    extract_wsi_labels_or_macro(r'E:\胃癌\胃癌SVS文件\档案号确定\表格有对应\正常', r'E:\胃癌\胃癌SVS文件\档案号确定\表格有对应\正常_Macro', label_or_macro='label')

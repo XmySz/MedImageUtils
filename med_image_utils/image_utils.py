@@ -1,3 +1,4 @@
+import glob
 import os
 
 import cv2
@@ -70,6 +71,63 @@ def downsample_image(input_path: str, output_path: str, scale: int) -> None:
     img_downsampled.save(output_path)
 
 
+def fix_xray_overexposure(
+        image_path: str,
+        low_pct: float = 1.0,
+        high_pct: float = 99.0,
+        gamma: float = 1.2,
+) -> None:
+    """Robust contrast stretch (percentile clipping) + gamma correction for X-ray images, saved in-place.
+
+    Args:
+        image_path: Path to the input image. Output overwrites this file.
+        low_pct: Lower percentile for clipping (e.g., 1.0).
+        high_pct: Upper percentile for clipping (e.g., 99.0).
+        gamma: Gamma > 1 darkens highlights; gamma < 1 brightens.
+    """
+    img = Image.open(image_path).convert("L")
+    a = np.asarray(img, dtype=np.float32)
+
+    p_low, p_high = np.percentile(a, [low_pct, high_pct])
+    a = np.clip((a - p_low) * 255.0 / max(p_high - p_low, 1e-6), 0, 255)
+
+    a = 255.0 * np.power(a / 255.0, gamma)
+    Image.fromarray(a.astype(np.uint8)).save(image_path)
+
+
+def fix_xray_with_clahe(
+        image_path: str,
+        low_pct: float = 1.0,
+        high_pct: float = 99.0,
+        gamma: float = 1.2,
+        clip_limit: float = 2.0,
+        tile_grid_size: tuple[int, int] = (8, 8),
+) -> None:
+    """Percentile contrast stretch + CLAHE + gamma correction for X-ray images, saved in-place.
+
+    Args:
+        image_path: Path to the image. Output overwrites this file.
+        low_pct: Lower percentile for clipping.
+        high_pct: Upper percentile for clipping.
+        gamma: Gamma > 1 darkens highlights; gamma < 1 brightens.
+        clip_limit: CLAHE clip limit.
+        tile_grid_size: CLAHE tile grid size (rows, cols).
+    """
+    img = Image.open(image_path).convert("L")
+    a = np.asarray(img, dtype=np.float32)
+
+    p_low, p_high = np.percentile(a, [low_pct, high_pct])
+    a = np.clip((a - p_low) * 255.0 / max(p_high - p_low, 1e-6), 0, 255).astype(np.uint8)
+
+    import cv2  # requires opencv-python
+
+    clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
+    a = clahe.apply(a).astype(np.float32)
+
+    a = 255.0 * np.power(a / 255.0, gamma)
+    Image.fromarray(a.astype(np.uint8)).save(image_path)
+
+
 if __name__ == '__main__':
     # keep_largest_n_component(r'D:\Data\PycharmProjects\WSI_Segmenter-master\tumor_mask_continuous.png',
     #                          r'D:\Data\PycharmProjects\WSI_Segmenter-master\tumor_mask_continuous2.png')
@@ -80,6 +138,6 @@ if __name__ == '__main__':
     # downsample_image(r'F:\内膜\EC\TumorMask_PNG\2423347-5-6-HE-病理科_mask.png',
     #                 r'F:\内膜\EC\TumorMask_PNG\2423347-5-6-HE-病理科_mask_d4.png', 4)
 
-    for f in os.listdir(r'F:\内膜\EC\TumorMask_PNG\Original'):
+    for f in glob.glob(r'D:\Data\Jmszxyy\骨松四分类\Dataset\中大五院\Filtered\*'):
         print(f)
-        keep_largest_n_component(os.path.join(r'F:\内膜\EC\TumorMask_PNG\Original_D4_Dilate', f), os.path.join(r'F:\内膜\EC\TumorMask_PNG\Original_D4_Dilate_2_Component', f), 2)
+        fix_xray_with_clahe(f)
