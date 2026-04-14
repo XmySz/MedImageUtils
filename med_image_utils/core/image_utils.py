@@ -119,8 +119,6 @@ def fix_xray_with_clahe(
     p_low, p_high = np.percentile(a, [low_pct, high_pct])
     a = np.clip((a - p_low) * 255.0 / max(p_high - p_low, 1e-6), 0, 255).astype(np.uint8)
 
-    import cv2  # requires opencv-python
-
     clahe = cv2.createCLAHE(clipLimit=clip_limit, tileGridSize=tile_grid_size)
     a = clahe.apply(a).astype(np.float32)
 
@@ -138,6 +136,6 @@ if __name__ == '__main__':
     # downsample_image(r'F:\内膜\EC\TumorMask_PNG\2423347-5-6-HE-病理科_mask.png',
     #                 r'F:\内膜\EC\TumorMask_PNG\2423347-5-6-HE-病理科_mask_d4.png', 4)
 
-    for f in glob.glob(r'D:\Data\Jmszxyy\骨松四分类\Dataset\中大五院\Filtered\*'):
+    for f in glob.glob(r'D:\Data\Jmszxyy\骨松四分类\Dataset\茂名市人民医院\Filtered\新建文件夹\*'):
         print(f)
         fix_xray_with_clahe(f)

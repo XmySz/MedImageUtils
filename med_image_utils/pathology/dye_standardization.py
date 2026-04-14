@@ -206,8 +206,9 @@ def run_stain_normalization(
 
 
 if __name__ == "__main__":
+    import os
     # 参考图像路径（用于拟合染色标准化器）
-    REFERENCE_IMAGE_PATH = r"REFERENCE_IMAGE/img.png"
+    REFERENCE_IMAGE_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "resources", "staining_reference.png")
 
     # 输入路径：可以是单个图像文件，也可以是一个文件夹
     INPUT_PATH = r"D:\Data\Temp\CellProfiler\patch_000029_x15360_y6144.png"

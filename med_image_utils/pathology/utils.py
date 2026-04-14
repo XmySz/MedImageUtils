@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import cv2
 import staintools
@@ -15,6 +17,13 @@ from rasterio import features
 import tifffile
 from pathlib import Path
 from PIL import Image
+
+from pathlib import Path
+from typing import Tuple
+
+import numpy as np
+from PIL import Image
+import openslide
 
 
 def wsi_stain_normalization(reference_image_path: str,
@@ -156,33 +165,74 @@ def batch_convert(wsi_dir, geojson_dir, mask_dir, level=8):
         geojson_to_mask(wsi, geo, out, level=level)
 
 
-def export_wsi_thumbnail(wsi_path, downsample=16, output_path=None):
-    """导出WSI缩略图"""
+def export_wsi_thumbnail(wsi_path, magnification=5, output_path=None):
+    """
+    导出WSI指定放大倍率下的PNG格式图像（分块读取，兼容损坏瓦片）。
+
+    参数:
+        wsi_path:      SVS/WSI文件路径
+        magnification: 目标放大倍率，如 5 表示5x，默认5
+        output_path:   输出路径（文件或目录）；为None时保存到当前目录
+    返回:
+        实际保存的文件路径
+    """
     slide = openslide.OpenSlide(wsi_path)
 
-    # 找最接近的level
+    # ---- 计算downsample ----
+    obj_power = slide.properties.get(openslide.PROPERTY_NAME_OBJECTIVE_POWER)
+    if obj_power is None:
+        slide.close()
+        raise ValueError("WSI元数据中不包含物镜倍率信息，无法按magnification导出。")
+    downsample = float(obj_power) / magnification
+
+    # ---- 选择最接近的level ----
     level = min(range(slide.level_count),
                 key=lambda i: abs(slide.level_downsamples[i] - downsample))
+    actual_ds = slide.level_downsamples[level]
+    level_w, level_h = slide.level_dimensions[level]
 
-    # 读取并转换
-    size = slide.level_dimensions[level]
-    img = slide.read_region((0, 0), level, size).convert('RGB')
+    # ---- 分块读取（核心：规避损坏瓦片） ----
+    TILE = 2048  # 每块大小（level坐标系下）
+    canvas = np.zeros((level_h, level_w, 3), dtype=np.uint8)
 
-    # 如需要则调整大小
-    actual_downsample = slide.level_downsamples[level]
-    if abs(actual_downsample - downsample) > 0.1:
-        scale = actual_downsample / downsample
-        new_size = (int(size[0] / scale), int(size[1] / scale))
+    for y0 in range(0, level_h, TILE):
+        for x0 in range(0, level_w, TILE):
+            tw = min(TILE, level_w - x0)
+            th = min(TILE, level_h - y0)
+            # read_region 的坐标必须是 level-0 坐标系
+            loc_x = int(x0 * actual_ds)
+            loc_y = int(y0 * actual_ds)
+            try:
+                tile = slide.read_region((loc_x, loc_y), level, (tw, th)).convert('RGB')
+                canvas[y0:y0 + th, x0:x0 + tw] = np.array(tile)
+            except openslide.OpenSlideError:
+                # 损坏瓦片填白色
+                canvas[y0:y0 + th, x0:x0 + tw] = 255
+                print(f"  [警告] 瓦片({x0},{y0})读取失败，已填充白色")
+
+    img = Image.fromarray(canvas)
+
+    # ---- 精确缩放到目标downsample ----
+    if abs(actual_ds - downsample) > 0.1:
+        scale = actual_ds / downsample
+        new_size = (max(1, int(level_w / scale)),
+                    max(1, int(level_h / scale)))
         img = img.resize(new_size, Image.LANCZOS)
 
-    # 自动处理输出路径
+    # ---- 构建输出路径 ----
     if output_path is None or os.path.isdir(output_path):
         basename = os.path.splitext(os.path.basename(wsi_path))[0]
-        filename = f"{basename}_x{downsample}.jpg"
+        filename = f"{basename}_{magnification}x.png"
         output_path = filename if output_path is None else os.path.join(output_path, filename)
 
-    img.save(output_path, 'JPEG', quality=95)
+    out_dir = os.path.dirname(output_path)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+
+    img.save(output_path, 'PNG')
     slide.close()
+
+    print(f"已导出: {output_path}  |  尺寸: {img.size}  |  downsample≈{downsample:.2f}")
     return output_path
 
 
@@ -206,6 +256,7 @@ def extract_wsi_labels_or_macro(input_dir, output_dir, label_or_macro='label'):
         except Exception as e:
             print(f"{svs_file} 处理过程中出现了错误! ")
 
+
 if __name__ == "__main__":
     # wsi_dir =     r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testWSI"
     # geojson_dir = r"\\wsl.localhost\Ubuntu-22.04\home\zyn\PycharmProjects\hover_net\testGeoJson"
@@ -217,4 +268,7 @@ if __name__ == "__main__":
     # mask_dir = r"\\172.23.3.8\yxyxlab\Zyn\PyCharmProjects\hover_net\testWSImasks"
     # batch_convert(wsi_dir, geojson_dir, mask_dir, level=4)
 
-    extract_wsi_labels_or_macro(r'E:\胃癌\胃癌SVS文件\档案号确定\表格有对应\正常', r'E:\胃癌\胃癌SVS文件\档案号确定\表格有对应\正常_Macro', label_or_macro='label')
+    # extract_wsi_labels_or_macro(r'E:\胃癌\胃癌SVS文件\档案号确定\表格有对应\正常', r'E:\胃癌\胃癌SVS文件\档案号确定\表格有对应\正常_Macro', label_or_macro='label')
+    export_wsi_thumbnail(r'D:\Data\Jmszxyy\组织分割\转换后类别\test\20264181-原发灶-HE.svs',
+                         output_path=r'D:\Data\Jmszxyy\组织分割\转换后类别\test\20264181-原发灶-HE.png',
+                         magnification=10)

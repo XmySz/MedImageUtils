@@ -287,8 +287,8 @@ def filter_table_by_reference_table(target_table_path, ref_table_path, col_name,
     try:
         # 1. 读取两个表格
         # 强制转换为字符串类型，避免 "001" 和 1 无法匹配的问题
-        df_target = pd.read_excel(target_table_path, dtype={col_name: str}, sheet_name='CenterA(jm)')
-        df_ref = pd.read_excel(ref_table_path, dtype={col_name: str}, sheet_name='仅张博')
+        df_target = pd.read_excel(target_table_path, dtype={col_name: str}, header=1)
+        df_ref = pd.read_excel(ref_table_path, dtype={col_name: str})
 
         # 2. 获取参考表中的所有唯一值
         # 预处理：转字符串 -> 去除首尾空格 -> 转小写 (根据需求可去掉 .lower()) -> 存入 set 加速查找
@@ -450,8 +450,8 @@ def create_folders_from_excel(excel_path: str, target_dir: str, col_name: str) -
 
 
 if __name__ == '__main__':
-    # rename_files_from_excel(r'D:\Data\Jmszxyy\骨松四分类\Dataset\新补充_筛选\英文名\已匹配到',
-    #                         r'D:\Data\Jmszxyy\骨松四分类\Dataset\新补充_筛选\中文名.xlsx', '姓名拼音', '姓名')
+    # rename_files_from_excel(r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\新补充\已匹配到 - 复制',
+    #                         r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\江门市中心医院_1.xlsx', '姓名', '住院号')
 
     # export_files_to_excel(r'E:\胃癌\胃癌SVS文件\表格无对应', r'E:\胃癌\胃癌SVS文件\表格无对应.xlsx')
 
@@ -464,21 +464,24 @@ if __name__ == '__main__':
 
     # print(compare_directories(r'F:\EC\WSI\最终可用', r'Z:\Zyn\PyCharmProjects\Jmzxyy\WSI_Segmenter-master\WSIs'))
 
-    # delete_unmatched_files(r'D:\Data\Jmszxyy\骨松四分类\Dataset\新补充_筛选\英文名.xlsx', '姓名拼音',
-    #                           r'D:\Data\Jmszxyy\骨松四分类\Dataset\新补充_筛选\英文名\已匹配到')
+    # delete_unmatched_files(r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\江门市中心医院.xlsx', '住院号',
+    #                           r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Filtered')
 
-    # filter_table_by_filenames(r'C:\Users\Administrator\Desktop\manifest-1754069116660\clinical.xlsx',
-    #                           'cases.submitter_id',
-    #                           r'C:\Users\Administrator\Desktop\manifest-1754069116660\CPTAC-LSCC\CT',
-    #                           r'C:\Users\Administrator\Desktop\manifest-1754069116660\CPTAC-LSCC\基因临床表.xlsx')
+    # filter_table_by_filenames(r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\江门市中心医院.xlsx',
+    #                           '住院号',
+    #                           r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Filtered',
+    #                           r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\江门市中心医院_1.xlsx')
 
-    # filter_table_by_reference_table(
-    #                                 r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\临床信息表汇总.xlsx',r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Labels.xlsx',
-    #                                 '住院号',
-    #                                 r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Labels1.xlsx')
 
-    merge_tables(r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Labels.xlsx',
-                 r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Labels1.xlsx',
-                 '住院号',
-                 r'是否骨折',
-                 r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\labels2.xlsx')
+    # merge_tables(r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Labels.xlsx',
+    #              r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\Labels1.xlsx',
+    #              '住院号',
+    #              r'是否骨折',
+    #              r'D:\Data\Jmszxyy\骨松四分类\Dataset\江门市中心医院\labels2.xlsx')
+
+    # create_folders_from_excel(r"C:\Users\Administrator\Desktop\深圳人民医院最终名单（含身高体重）.xlsx", r"C:\Users\Administrator\Desktop\新建文件夹", '姓名')
+
+    filter_table_by_reference_table(r"C:\Users\Administrator\Desktop\总表.xlsx",
+                                    r"D:\Data\Jmszxyy\骨松四分类\Dataset\广州市第二人民医院\广州市第二人民医院.xlsx",
+                                    '住院号',
+                                    r"C:\Users\Administrator\Desktop\总表_1.xlsx")
